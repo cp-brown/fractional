@@ -1,0 +1,12 @@
+2    method
+1    a
+-0.5    order
+1    ic
+1    focus
+0.5    t1
+5    t2
+120    nz
+1    sigma
+0.001    dt
+1    nt, below are the times
+2

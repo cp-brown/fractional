@@ -23,38 +23,9 @@ module procedure invert2_2d
     complex(dp), allocatable :: z_pts(:), z_derivs(:)
 
 
-    ! --- For the Laplacian matrix Amat and identity matrix Imat --- !
-
-    ! For converting to complex format
-    complex(C_DOUBLE_COMPLEX), allocatable :: Amat_vals_cmplx(:)
-    complex(C_DOUBLE_COMPLEX), allocatable :: Imat_vals_cmplx(:)
-
-    ! MKL sparse BLAS handles
-    type(SPARSE_MATRIX_T) :: Amat
-    type(SPARSE_MATRIX_T) :: Imat
-
-
     ! --- For the lhs matrix --- !
 
-    ! MKL sparse BLAS handle
-    type(SPARSE_MATRIX_T) :: lhs
-
-    ! Variables needed for mkl_sparse_z_export_csr, otherwise unused
-    integer(C_INT) :: lhs_idxing
-    integer(C_INT) :: lhs_nrows, lhs_ncols
-
-    ! C pointers for exporting
-    type(c_ptr) :: lhs_rowptrb_c, lhs_rowptre_c
-    type(c_ptr) :: lhs_cols_c
-    type(c_ptr) :: lhs_vals_c
-
-    ! Fortran pointers for exporting
-    integer(C_INT), pointer :: lhs_rowptrb(:), lhs_rowptre(:)
-    integer(C_INT), pointer :: lhs_cols(:)
-    complex(C_DOUBLE_COMPLEX), pointer :: lhs_vals(:)
-
-    ! Number of non-zero elements
-    integer :: lhs_nnz
+    complex(dp), allocatable :: lhs_vals(:)
 
     ! Array used by mkl_dss, to be computed from ptrb and ptre
     integer, allocatable :: lhs_rowidx(:)
@@ -85,6 +56,9 @@ module procedure invert2_2d
 
     ! To temporarily store the linear system solution
     complex(dp), allocatable :: solnvec(:)
+
+    ! 
+    integer, dimension(1) :: dss_reorder_perm = [0]
 
 
     ! --- Miscellaneous --- !
@@ -166,68 +140,18 @@ module procedure invert2_2d
 ! Matrix and solver setup
 ! ------------------------------------------------------------------------------
 
-    ! --- Given matrix processing --- !
-
-    ! Convert Amat, Imat values to complex format
-    allocate(Amat_vals_cmplx(size(Amat_vals)), Imat_vals_cmplx(size(Imat_vals)), stat=stat, errmsg=msg)
-    if (stat /= 0) then
-        write(*,*) 'invert2: allocate: ', msg
-        return
-    end if
-    Amat_vals_cmplx = cmplx(Amat_vals, kind=C_DOUBLE_COMPLEX)
-    Imat_vals_cmplx = cmplx(Imat_vals, kind=C_DOUBLE_COMPLEX)
-
-    ! Export Amat to MKL sparse format
-    stat = mkl_sparse_z_create_csr(Amat, SPARSE_INDEX_BASE_ONE, nx*ny, nx*ny, &
-        Amat_rowptrb, Amat_rowptre, Amat_cols, Amat_vals_cmplx)
-    if (stat /= 0) then
-        write(*,*) 'invert2: mkl_sparse_d_create_csr: exited with code ', stat
-        return
-    end if
-    
-    ! Export Imat to MKL sparse format
-    stat = mkl_sparse_z_create_csr(Imat, SPARSE_INDEX_BASE_ONE, nx*ny, nx*ny, &
-        Imat_rowptrb, Imat_rowptre, Imat_cols, Imat_vals_cmplx)
-    if (stat /= 0) then
-        write(*,*) 'invert2: mkl_sparse_d_create_csr: exited with code ', stat
-        return
-    end if
-
-
     ! --- Generate lhs matrix structure for the solver setup --- !
 
-    ! Compute the sum - the values will be ignored
-    stat = mkl_sparse_z_add(SPARSE_OPERATION_NON_TRANSPOSE, Imat, &
-        (1.0_dp,0.0_dp), Amat, lhs)
-    if (stat /= 0) then
-        write(*,*) 'invert2: mkl_sparse_z_add: exited with code ', stat
-        return
-    end if
-
-    ! Export to c_ptr arrays
-    stat = mkl_sparse_z_export_csr(lhs, lhs_idxing, lhs_nrows, lhs_ncols, &
-        lhs_rowptrb_c, lhs_rowptre_c, lhs_cols_c, lhs_vals_c)
-    if (stat /= 0) then
-        write(*,*) 'invert2: mkl_sparse_z_export_csr: exited with code ', stat
-        return
-    end if
-
-    ! Convert c pointers to fortran pointers - structure arrays only
-    call c_f_pointer(lhs_rowptrb_c, lhs_rowptrb, [nx*ny])
-    call c_f_pointer(lhs_rowptre_c, lhs_rowptre, [nx*ny])
-    lhs_nnz = lhs_rowptre(nx*ny) - 1
-    call c_f_pointer(lhs_cols_c, lhs_cols, [lhs_nnz])
-
     ! Allocate lhs_rowidx
-    allocate(lhs_rowidx(nx*ny+1), stat=stat, errmsg=msg)
+    allocate(lhs_rowidx(nx*ny+1), lhs_vals(Amat_rowptre(nx*ny)-1), stat=stat, errmsg=msg)
     if (stat /= 0) then
         write(*,*) 'invert2: allocate: ', msg
         return
     end if
 
     ! Compute lhs_rowidx
-    lhs_rowidx(1:nx*ny) = lhs_rowptrb
-    lhs_rowidx(nx*ny+1) = lhs_rowptre(nx*ny)
+    lhs_rowidx(1:nx*ny) = Amat_rowptrb
+    lhs_rowidx(nx*ny+1) = Amat_rowptre(nx*ny)
 
 
     ! --- Solver setup and re-ordering --- !
@@ -241,14 +165,14 @@ module procedure invert2_2d
 
     ! Define structure
     stat = dss_define_structure(dss_handle, MKL_DSS_SYMMETRIC_COMPLEX, &
-        lhs_rowidx, nx*ny, nx*ny, lhs_cols, lhs_nnz)
+        lhs_rowidx, nx*ny, nx*ny, Amat_cols, lhs_rowidx(nx*ny+1)-1)
     if (stat /= 0) then
         write(*,*) 'invert2: dss_define_structure: exited with code ', stat
         return
     end if
 
     ! Perform re-ordering
-    stat = dss_reorder(dss_handle, MKL_DSS_DEFAULTS, [0])
+    stat = dss_reorder(dss_handle, MKL_DSS_DEFAULTS, dss_reorder_perm)
     if (stat /= 0) then
         write(*,*) 'invert2: dss_reorder: exited with code ', stat
         return
@@ -301,23 +225,7 @@ module procedure invert2_2d
         ! --- Generate the lhs matrix entries --- !
 
         ! Compute the sum
-        stat = mkl_sparse_z_add(SPARSE_OPERATION_NON_TRANSPOSE, Imat, &
-            z_pts(j)**(order+1.0_dp), Amat, lhs)
-        if (stat /= 0) then
-            write(*,*) 'invert2: mkl_sparse_z_add: exited with code ', stat
-            return
-        end if
-
-        ! Export to c_ptr arrays
-        stat = mkl_sparse_z_export_csr(lhs, lhs_idxing, lhs_nrows, lhs_ncols, &
-            lhs_rowptrb_c, lhs_rowptre_c, lhs_cols_c, lhs_vals_c)
-        if (stat /= 0) then
-            write(*,*) 'invert2: mkl_sparse_z_export_csr: exited with code ', stat
-            return
-        end if
-
-        ! Convert c pointer to fortran pointer - value array only
-        call c_f_pointer(lhs_vals_c, lhs_vals, [lhs_nnz])
+        lhs_vals = z_pts(j)**(order+1.0_dp) * Imat_vals + Amat_vals
 
 
         ! --- Generate the rhs vector --- !
@@ -393,13 +301,6 @@ module procedure invert2_2d
         return
     end if
 
-    ! Delete lhs MKL object
-    stat = mkl_sparse_destroy(lhs)
-    if (stat /= 0) then
-        write(*,*) 'invert2: mkl_sparse_destroy: exited with code ', stat
-        return
-    end if
-
     ! rhs deallocations
     deallocate(n_rhspts_x, n_rhspts_y, rhspts_x, rhspts_y, rhsevals, rhs, stat=stat, errmsg=msg)
     if (stat /= 0) then
@@ -408,7 +309,7 @@ module procedure invert2_2d
     end if
 
     ! Other deallocations
-    deallocate(z_derivs, Amat_vals_cmplx, Imat_vals_cmplx, lhs_rowidx, &
+    deallocate(z_derivs, lhs_rowidx, lhs_vals, &
         weights, stat=stat, errmsg=msg)
     if (stat /= 0) then
         write(*,*) 'invert2: deallocate: ', msg

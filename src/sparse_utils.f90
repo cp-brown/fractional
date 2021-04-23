@@ -144,10 +144,11 @@ subroutine csr_kron_sym(A_rowptrb, A_rowptre, A_cols, A_vals, B_rowptrb, &
     integer, allocatable :: Z_rowptrb(:), Z_rowptre(:), Z_cols(:)
     real(dp), allocatable :: Z_vals(:)
     type(SPARSE_MATRIX_T) :: Bmat, Zmat, Bt
-    integer(C_INT) :: Bt_idxing, Bt_nrows, Bt_ncols, Bt_nnz
+    integer(C_INT) :: Bt_idxing
+    integer :: Bt_nrows, Bt_ncols, Bt_nnz
     type(c_ptr) :: Bt_rowptrb_c, Bt_rowptre_c, Bt_cols_c, Bt_vals_c
-    integer(C_INT), pointer :: Bt_rowptrb(:), Bt_rowptre(:), Bt_cols(:)
-    real(C_DOUBLE), pointer :: Bt_vals(:)
+    integer, pointer :: Bt_rowptrb(:), Bt_rowptre(:), Bt_cols(:)
+    real(dp), pointer :: Bt_vals(:)
 
     ! Iterators
     integer :: i, j, k, l

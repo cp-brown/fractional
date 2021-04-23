@@ -2,5 +2,5 @@
 
 for file in ./in/*
 do
-    ./2003ex3 "$file" > $(echo $file | sed 's/in/out/')
+    ./2003ex3_exec "$file" > $(echo $file | sed 's/in/out/')
 done

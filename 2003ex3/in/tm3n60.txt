@@ -1,4 +1,4 @@
-2    method
+3    method
 1    diffusion coefficient
 0    order
 0    focus

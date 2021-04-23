@@ -57,6 +57,9 @@ module procedure invert1_1d
     ! To temporarily store the linear system solution
     complex(dp), allocatable :: solnvec(:)
 
+    ! 
+    integer, dimension(1) :: dss_reorder_perm = [0]
+
 
     ! --- Miscellaneous --- !
 
@@ -75,7 +78,7 @@ module procedure invert1_1d
 ! ------------------------------------------------------------------------------
 ! Input processing
 ! ------------------------------------------------------------------------------
-    
+
     ! Deallocate soln if already allocated
     if (allocated(soln)) deallocate(soln, stat=stat, errmsg=msg)
     if (stat /= 0) then
@@ -130,7 +133,7 @@ module procedure invert1_1d
     ! --- Generate lhs matrix structure for the solver setup --- !
 
     ! Allocate lhs_rowidx, lhs_vals
-    allocate(lhs_rowidx(nx+1), lhs_vals(Amat_rowptre(nx+1)-1), stat=stat, errmsg=msg)
+    allocate(lhs_rowidx(nx+1), lhs_vals(Amat_rowptre(nx)-1), stat=stat, errmsg=msg)
     if (stat /= 0) then
         write(*,*) 'invert1: allocate: ', msg
         return
@@ -159,7 +162,7 @@ module procedure invert1_1d
     end if
 
     ! Perform re-ordering
-    stat = dss_reorder(dss_handle, MKL_DSS_DEFAULTS, [0])
+    stat = dss_reorder(dss_handle, MKL_DSS_DEFAULTS, dss_reorder_perm)
     if (stat /= 0) then
         write(*,*) 'invert1: dss_reorder: exited with code ', stat
         return

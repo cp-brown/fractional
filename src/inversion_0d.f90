@@ -1,7 +1,6 @@
 module inversion_0d
 use utils, only: dp, pi, imagunit
 use integration, only: defint_fn_trap_real, defint_fn_trap_cmplx, indefint_fn_trap_real
-use mpi_f08
 implicit none
 private
 public invert1_0d, invert2_0d, invert3_0d
@@ -25,7 +24,7 @@ end function fhat
 
 
 module subroutine invert1_0d(a, order, fhat_fn, ic, focus, incline, t1, t2, &
-    nz, theta, times, solncore, comm, soln, stat)
+    nz, theta, times, soln, stat)
 
     ! --- Inputs --- !
 
@@ -59,12 +58,6 @@ module subroutine invert1_0d(a, order, fhat_fn, ic, focus, incline, t1, t2, &
     ! Times at which a solution is requested
     real(dp), intent(in) :: times(:)
 
-    ! Core to receive solution
-    integer :: solncore
-
-    ! MPI Communicator
-    type(MPI_COMM) :: comm
-
 
     ! --- Outputs --- !
 
@@ -79,7 +72,7 @@ end subroutine invert1_0d
 
 
 module subroutine invert2_0d(a, order, f_fn, fhat_fn, ic, focus, incline, t2, &
-    nz, sigma, dt, times, solncore, comm, soln, stat)
+    nz, sigma, dt, times, soln, stat)
 
     ! --- Inputs --- !
 
@@ -119,12 +112,6 @@ module subroutine invert2_0d(a, order, f_fn, fhat_fn, ic, focus, incline, t2, &
     ! Times at which a solution is requested
     real(dp), intent(in) :: times(:)
 
-    ! Core to receive solution
-    integer :: solncore
-
-    ! MPI Communicator
-    type(MPI_COMM) :: comm
-
 
     ! --- Outputs --- !
 
@@ -138,7 +125,7 @@ end subroutine invert2_0d
 
 
 
-module subroutine invert3_0d(a, order, f_fn, ic, t2, nz, sigma, dt, times, solncore, comm, soln, stat)
+module subroutine invert3_0d(a, order, f_fn, ic, t2, nz, sigma, dt, times, soln, stat)
 
     ! --- Inputs --- !
 
@@ -168,12 +155,6 @@ module subroutine invert3_0d(a, order, f_fn, ic, t2, nz, sigma, dt, times, solnc
 
     ! Times at which a solution is requested
     real(dp), intent(in) :: times(:)
-
-    ! Core to receive solution
-    integer :: solncore
-
-    ! MPI Communicator
-    type(MPI_COMM) :: comm
 
 
     ! --- Outputs --- !

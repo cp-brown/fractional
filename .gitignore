@@ -1,0 +1,4 @@
+mods/*
+objs/*
+*_exec
+*/out/*
